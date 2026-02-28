@@ -17,12 +17,14 @@ jobs:
           node-version: '22.x'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
-          cache-dependency-path: package-lock.json
+          cache-dependency-path: smart-organizer/package-lock.json
 
       - name: Install dependencies
+        working-directory: smart-organizer
         run: npm ci
 
       - name: Run tests
+        working-directory: smart-organizer
         run: npm test
 
       - name: Publish to NPM

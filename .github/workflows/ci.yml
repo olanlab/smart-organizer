@@ -23,13 +23,16 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        cache-dependency-path: package-lock.json
+        cache-dependency-path: smart-organizer/package-lock.json
 
     - name: Install dependencies
+      working-directory: smart-organizer
       run: npm ci
 
     - name: Run linter
+      working-directory: smart-organizer
       run: npm run lint
 
     - name: Run tests
+      working-directory: smart-organizer
       run: npm test
