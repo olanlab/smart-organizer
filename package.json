@@ -1,0 +1,25 @@
+{
+  "name": "smart-organizer",
+  "version": "1.0.0",
+  "description": "",
+  "bin": {
+    "org": "./bin/index.js"
+  },
+  "main": "index.js",
+  "scripts": {
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^14.0.3",
+    "fs-extra": "^11.3.3"
+  },
+  "devDependencies": {
+    "eslint": "^10.0.2",
+    "jest": "^30.2.0"
+  }
+}
