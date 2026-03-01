@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: "npm" # Check for npm updates
+    directory: "/" # Root directory
+    schedule:
+      interval: "weekly" # Check every week
+    open-pull-requests-limit: 5 # Maximum number of PRs to open
+  - package-ecosystem: "github-actions" # Check for GitHub Actions updates
+    directory: "/"
+    schedule:
+      interval: "weekly"
