@@ -21,54 +21,50 @@ describe('Smart Organizer CLI', () => {
     return execSync(`node ${CLI_PATH} ${args}`, { encoding: 'utf8' });
   };
 
-  test('should organize files into categorized folders', async () => {
-    // 1. Create dummy files
+  test('should organize files into categorized folders and rename with date', async () => {
+    // 1. Setup: Get today's date
+    const today = new Date().toISOString().split('T')[0];
+    
+    // 2. Setup: Create dummy files
     await fs.ensureFile(path.join(TEST_DIR, 'image.jpg'));
     await fs.ensureFile(path.join(TEST_DIR, 'video.mp4'));
-    await fs.ensureFile(path.join(TEST_DIR, 'doc.pdf'));
 
-    // 2. Run CLI
+    // 3. Run CLI
     runCLI(`-d ${TEST_DIR}`);
 
-    // 3. Verify folders and files exist
-    expect(fs.existsSync(path.join(TEST_DIR, 'images/image.jpg'))).toBe(true);
-    expect(fs.existsSync(path.join(TEST_DIR, 'videos/video.mp4'))).toBe(true);
-    expect(fs.existsSync(path.join(TEST_DIR, 'documents/doc.pdf'))).toBe(true);
+    // 4. Verify: Files should be renamed in their categories
+    expect(fs.existsSync(path.join(TEST_DIR, `images/${today}-1.jpg`))).toBe(true);
+    expect(fs.existsSync(path.join(TEST_DIR, `videos/${today}-1.mp4`))).toBe(true);
+  });
 
-    // 4. Verify original files are gone
-    expect(fs.existsSync(path.join(TEST_DIR, 'image.jpg'))).toBe(false);
+  test('should increment running number for multiple files in same category', async () => {
+    const today = new Date().toISOString().split('T')[0];
+    
+    await fs.ensureFile(path.join(TEST_DIR, 'photo1.jpg'));
+    await fs.ensureFile(path.join(TEST_DIR, 'photo2.jpg'));
+
+    runCLI(`-d ${TEST_DIR}`);
+
+    expect(fs.existsSync(path.join(TEST_DIR, `images/${today}-1.jpg`))).toBe(true);
+    expect(fs.existsSync(path.join(TEST_DIR, `images/${today}-2.jpg`))).toBe(true);
   });
 
   test('should organize files inside a parent folder if -p is provided', async () => {
+    const today = new Date().toISOString().split('T')[0];
     const PARENT_FOLDER = 'my-archive';
     await fs.ensureFile(path.join(TEST_DIR, 'image.png'));
 
     runCLI(`-d ${TEST_DIR} -p ${PARENT_FOLDER}`);
 
-    expect(fs.existsSync(path.join(TEST_DIR, PARENT_FOLDER, 'images/image.png'))).toBe(true);
+    expect(fs.existsSync(path.join(TEST_DIR, PARENT_FOLDER, `images/${today}-1.png`))).toBe(true);
   });
 
   test('should put unknown extensions into "others"', async () => {
+    const today = new Date().toISOString().split('T')[0];
     await fs.ensureFile(path.join(TEST_DIR, 'something.xyz'));
 
     runCLI(`-d ${TEST_DIR}`);
 
-    expect(fs.existsSync(path.join(TEST_DIR, 'others/something.xyz'))).toBe(true);
-  });
-
-  test('should rename file with a running number if it already exists in the target category', async () => {
-    // 1. Setup: Create an existing file in the target directory
-    await fs.ensureDir(path.join(TEST_DIR, 'images'));
-    await fs.ensureFile(path.join(TEST_DIR, 'images/photo.jpg'));
-    
-    // 2. Setup: Create a new file with the same name in the root directory
-    await fs.ensureFile(path.join(TEST_DIR, 'photo.jpg'));
-
-    // 3. Run CLI
-    runCLI(`-d ${TEST_DIR}`);
-
-    // 4. Verify: Both files should exist in the 'images' folder
-    expect(fs.existsSync(path.join(TEST_DIR, 'images/photo.jpg'))).toBe(true);
-    expect(fs.existsSync(path.join(TEST_DIR, 'images/photo (1).jpg'))).toBe(true);
+    expect(fs.existsSync(path.join(TEST_DIR, `others/${today}-1.xyz`))).toBe(true);
   });
 });

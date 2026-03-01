@@ -43,25 +43,22 @@ program
           
           await fs.ensureDir(categoryDir);
           
-          let finalDestPath = path.join(categoryDir, file);
-          let finalFileName = file;
+          const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
+          const ext = path.extname(file).toLowerCase();
+          let counter = 1;
+          let finalFileName = `${today}-${counter}${ext}`;
+          let finalDestPath = path.join(categoryDir, finalFileName);
 
-          // If file exists, generate a unique name
-          if (await fs.pathExists(finalDestPath)) {
-            const ext = path.extname(file);
-            const base = path.basename(file, ext);
-            let counter = 1;
-
-            while (await fs.pathExists(finalDestPath)) {
-              finalFileName = `${base} (${counter})${ext}`;
-              finalDestPath = path.join(categoryDir, finalFileName);
-              counter++;
-            }
+          // If file exists, increment running number
+          while (await fs.pathExists(finalDestPath)) {
+            counter++;
+            finalFileName = `${today}-${counter}${ext}`;
+            finalDestPath = path.join(categoryDir, finalFileName);
           }
 
           await fs.move(filePath, finalDestPath);
           
-          console.log(chalk.green(`Moved: ${file} -> ${categoryPath}/${finalFileName}`));
+          console.log(chalk.green(`Moved and Renamed: ${file} -> ${categoryPath}/${finalFileName}`));
           movedCount++;
         }
       }
