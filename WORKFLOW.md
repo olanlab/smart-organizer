@@ -33,6 +33,8 @@ gh pr create --title "<หัวข้อ>" --body "<รายละเอีย
 gh pr merge --auto --squash --delete-branch
 ```
 
+gh pr create --title "feat: remove support for psd formats" --body "Removing new file categories"
+
 ## 4. ระบบอัตโนมัติบน GitHub (CI/CD Pipeline)
 หลังจากที่คุณสั่ง Merge ระบบจะทำงานต่อให้เอง 100%:
 1.  **Test & Lint:** ตรวจสอบความถูกต้องและความสวยงามของโค้ด
