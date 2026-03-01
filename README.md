@@ -1,5 +1,9 @@
 # Smart Organizer CLI
 
+![Build Status](https://img.shields.io/github/actions/workflow/status/olanlab/smart-organizer/pipeline.yml?branch=main)
+![NPM Version](https://img.shields.io/npm/v/@olanlab/smart-organizer)
+![License](https://img.shields.io/github/license/olanlab/smart-organizer)
+
 A simple CLI tool to organize your files into categorized folders automatically.
 
 ## Installation

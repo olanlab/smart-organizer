@@ -1,0 +1,18 @@
+npx --no -- commitlint --edit "$1" || {
+  echo "\n❌ Commit message invalid! ❌"
+  echo "---------------------------"
+  echo "Please use the following format:"
+  echo "  <type>: <subject>"
+  echo "\nAvailable types:"
+  echo "  feat:     (new feature)"
+  echo "  fix:      (bug fix)"
+  echo "  chore:    (maintenance, no release)"
+  echo "  docs:     (documentation changes)"
+  echo "  style:    (formatting, missing semi-colons, etc)"
+  echo "  refactor: (code change that neither fixes a bug nor adds a feature)"
+  echo "  perf:     (code change that improves performance)"
+  echo "  test:     (adding missing tests)"
+  echo "---------------------------"
+  echo "Example: feat: add support for PDF files\n"
+  exit 1
+}
