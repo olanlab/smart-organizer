@@ -1,6 +1,6 @@
 {
   "name": "@olanlab/smart-organizer",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "",
   "bin": {
     "org": "bin/index.js"

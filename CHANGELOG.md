@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/olanlab/smart-organizer/compare/v1.0.0...v1.1.0) (2026-03-01)
+
+
+### Features
+
+* complete automated pipeline setup ([b9f6f3a](https://github.com/olanlab/smart-organizer/commit/b9f6f3aa7c84b05b80e7d88aa95e696fb259cd5d))
+
 # 1.0.0 (2026-03-01)
 
 
