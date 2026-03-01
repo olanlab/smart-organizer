@@ -1,3 +1,11 @@
+## [1.2.1](https://github.com/olanlab/smart-organizer/compare/v1.2.0...v1.2.1) (2026-03-01)
+
+
+### Bug Fixes
+
+* remove psd support ([#5](https://github.com/olanlab/smart-organizer/issues/5)) ([b9960fc](https://github.com/olanlab/smart-organizer/commit/b9960fcfed29ad53be608fa161bf036d2733c511))
+* update github token to RELEASE_GITHUB_TOKEN for release ([#6](https://github.com/olanlab/smart-organizer/issues/6)) ([bba15df](https://github.com/olanlab/smart-organizer/commit/bba15df1a9231bbba54ca5a086a0a1371f9dfa60))
+
 # [1.2.0](https://github.com/olanlab/smart-organizer/compare/v1.1.0...v1.2.0) (2026-03-01)
 
 
