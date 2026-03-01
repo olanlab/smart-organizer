@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/olanlab/smart-organizer/compare/v1.1.0...v1.2.0) (2026-03-01)
+
+
+### Features
+
+* add support for photoshop files (.psd) ([#1](https://github.com/olanlab/smart-organizer/issues/1)) ([9dde772](https://github.com/olanlab/smart-organizer/commit/9dde7729cd4218fcbc55065a7e8ecef8a291b1e8))
+
 # [1.1.0](https://github.com/olanlab/smart-organizer/compare/v1.0.0...v1.1.0) (2026-03-01)
 
 
