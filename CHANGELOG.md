@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/olanlab/smart-organizer/compare/v1.4.0...v1.5.0) (2026-03-01)
+
+
+### Features
+
+* add --name option for custom filenames (closes [#11](https://github.com/olanlab/smart-organizer/issues/11)) ([#12](https://github.com/olanlab/smart-organizer/issues/12)) ([deeb6ad](https://github.com/olanlab/smart-organizer/commit/deeb6adefe7af3021fbda5e8648703981a75effc))
+
 # [1.4.0](https://github.com/olanlab/smart-organizer/compare/v1.3.0...v1.4.0) (2026-03-01)
 
 
