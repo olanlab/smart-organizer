@@ -55,4 +55,20 @@ describe('Smart Organizer CLI', () => {
 
     expect(fs.existsSync(path.join(TEST_DIR, 'others/something.xyz'))).toBe(true);
   });
+
+  test('should rename file with a running number if it already exists in the target category', async () => {
+    // 1. Setup: Create an existing file in the target directory
+    await fs.ensureDir(path.join(TEST_DIR, 'images'));
+    await fs.ensureFile(path.join(TEST_DIR, 'images/photo.jpg'));
+    
+    // 2. Setup: Create a new file with the same name in the root directory
+    await fs.ensureFile(path.join(TEST_DIR, 'photo.jpg'));
+
+    // 3. Run CLI
+    runCLI(`-d ${TEST_DIR}`);
+
+    // 4. Verify: Both files should exist in the 'images' folder
+    expect(fs.existsSync(path.join(TEST_DIR, 'images/photo.jpg'))).toBe(true);
+    expect(fs.existsSync(path.join(TEST_DIR, 'images/photo (1).jpg'))).toBe(true);
+  });
 });

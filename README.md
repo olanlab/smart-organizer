@@ -8,6 +8,12 @@ A simple CLI tool to organize your files into categorized folders automatically.
 
 ## Installation
 
+### Install from npmjs
+```bash
+npm install -g @olanlab/smart-organizer
+```
+
+### Install from source
 1.  Navigate to the project directory:
     ```bash
     cd smart-organizer
@@ -23,6 +29,12 @@ A simple CLI tool to organize your files into categorized folders automatically.
     npm link
     ```
     *Note: You might need `sudo` for this step.*
+
+4.  Unlink the global command (optional):
+    ```bash
+    npm unlink -g @olanlab/smart-organizer
+    ```
+    *If you linked with `sudo`, you might need `sudo` here as well.*
 
 ## Usage
 

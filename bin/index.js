@@ -43,10 +43,25 @@ program
           
           await fs.ensureDir(categoryDir);
           
-          const destPath = path.join(categoryDir, file);
-          await fs.move(filePath, destPath, { overwrite: false }); // Avoid overwriting
+          let finalDestPath = path.join(categoryDir, file);
+          let finalFileName = file;
+
+          // If file exists, generate a unique name
+          if (await fs.pathExists(finalDestPath)) {
+            const ext = path.extname(file);
+            const base = path.basename(file, ext);
+            let counter = 1;
+
+            while (await fs.pathExists(finalDestPath)) {
+              finalFileName = `${base} (${counter})${ext}`;
+              finalDestPath = path.join(categoryDir, finalFileName);
+              counter++;
+            }
+          }
+
+          await fs.move(filePath, finalDestPath);
           
-          console.log(chalk.green(`Moved: ${file} -> ${categoryPath}/`));
+          console.log(chalk.green(`Moved: ${file} -> ${categoryPath}/${finalFileName}`));
           movedCount++;
         }
       }
