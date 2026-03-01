@@ -65,7 +65,7 @@ Successfully organized ${movedCount} files!`));
 
 function getCategory(ext) {
   const categories = {
-    images: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.tiff', '.psd'],
+    images: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.bmp', '.tiff'],
     videos: ['.mp4', '.mkv', '.mov', '.avi', '.wmv', '.flv'],
     audio: ['.mp3', '.wav', '.flac', '.ogg', '.m4a', '.aac'],
     documents: ['.pdf', '.doc', '.docx', '.txt', '.xls', '.xlsx', '.ppt', '.pptx', '.csv', '.md'],
