@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "bin": {
-    "org": "./bin/index.js"
+    "org": "bin/index.js"
   },
   "main": "index.js",
   "scripts": {
