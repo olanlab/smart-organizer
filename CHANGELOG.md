@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/olanlab/smart-organizer/compare/v1.2.1...v1.3.0) (2026-03-01)
+
+
+### Features
+
+* add auto file rename functionality ([#7](https://github.com/olanlab/smart-organizer/issues/7)) ([#8](https://github.com/olanlab/smart-organizer/issues/8)) ([d693527](https://github.com/olanlab/smart-organizer/commit/d693527568118543a55316a69f69ca8d2920623d))
+
 ## [1.2.1](https://github.com/olanlab/smart-organizer/compare/v1.2.0...v1.2.1) (2026-03-01)
 
 
