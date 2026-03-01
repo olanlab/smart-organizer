@@ -11,6 +11,7 @@ program
   .description('A CLI to organize files into categorized folders')
   .option('-d, --dir <directory>', 'Directory to organize', '.')
   .option('-p, --parent <name>', 'Name of the parent folder to store categories (optional)')
+  .option('-n, --name <filename>', 'Custom filename (replaces default date-based name)')
   .action(async (options) => {
     const targetDir = path.resolve(options.dir);
 
@@ -43,16 +44,15 @@ program
           
           await fs.ensureDir(categoryDir);
           
-          const today = new Date().toISOString().split('T')[0]; // yyyy-mm-dd
-          const ext = path.extname(file).toLowerCase();
+          const fileBaseName = options.name ? options.name : new Date().toISOString().split('T')[0]; // Use custom name or today's date
           let counter = 1;
-          let finalFileName = `${today}-${counter}${ext}`;
+          let finalFileName = `${fileBaseName}-${counter}${ext}`;
           let finalDestPath = path.join(categoryDir, finalFileName);
 
           // If file exists, increment running number
           while (await fs.pathExists(finalDestPath)) {
             counter++;
-            finalFileName = `${today}-${counter}${ext}`;
+            finalFileName = `${fileBaseName}-${counter}${ext}`;
             finalDestPath = path.join(categoryDir, finalFileName);
           }
 

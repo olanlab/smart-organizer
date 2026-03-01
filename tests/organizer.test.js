@@ -67,4 +67,13 @@ describe('Smart Organizer CLI', () => {
 
     expect(fs.existsSync(path.join(TEST_DIR, `others/${today}-1.xyz`))).toBe(true);
   });
+
+  test('should use custom filename if --name is provided', async () => {
+    const CUSTOM_NAME = 'my-custom-file';
+    await fs.ensureFile(path.join(TEST_DIR, 'photo.jpg'));
+
+    runCLI(`-d ${TEST_DIR} --name ${CUSTOM_NAME}`);
+
+    expect(fs.existsSync(path.join(TEST_DIR, `images/${CUSTOM_NAME}-1.jpg`))).toBe(true);
+  });
 });
