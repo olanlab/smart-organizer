@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/olanlab/smart-organizer/compare/v1.3.0...v1.4.0) (2026-03-01)
+
+
+### Features
+
+* implement date-based file renaming (yyyy-mm-dd-n) (closes [#9](https://github.com/olanlab/smart-organizer/issues/9)) ([#10](https://github.com/olanlab/smart-organizer/issues/10)) ([6ec44b6](https://github.com/olanlab/smart-organizer/commit/6ec44b6c91fb9a42e190c70b2a774dec813db5b7))
+
 # [1.3.0](https://github.com/olanlab/smart-organizer/compare/v1.2.1...v1.3.0) (2026-03-01)
 
 
