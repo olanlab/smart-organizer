@@ -1,19 +1,36 @@
 {
   "name": "@olanlab/smart-organizer",
   "version": "1.5.0",
-  "description": "",
+  "description": "Organize files into categorized folders from the command line or an interactive TUI",
   "bin": {
     "org": "bin/index.js"
   },
-  "main": "index.js",
+  "main": "src/organizer.js",
+  "files": [
+    "bin",
+    "src"
+  ],
   "scripts": {
     "test": "jest",
     "lint": "eslint .",
     "prepare": "husky"
   },
-  "keywords": [],
+  "keywords": [
+    "cli",
+    "tui",
+    "organizer",
+    "files",
+    "rename"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/olanlab/smart-organizer.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "type": "commonjs",
   "publishConfig": {
     "access": "public"
