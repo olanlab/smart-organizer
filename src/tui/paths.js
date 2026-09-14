@@ -1,12 +1,10 @@
 // Folder paths typed into the TUI: "~" expansion and shell-style Tab completion.
 
 const fs = require('fs-extra');
-const os = require('os');
-const path = require('path');
+const { resolveFolder } = require('../paths');
 
 function resolveDir(input, baseDir) {
-  const expanded = input === '~' || input.startsWith('~/') ? path.join(os.homedir(), input.slice(1)) : input;
-  return path.resolve(baseDir, expanded);
+  return resolveFolder(baseDir, input);
 }
 
 function commonPrefix(names) {

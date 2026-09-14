@@ -10,6 +10,8 @@ const { DUPLICATE_MODES, applyDuplicateMode } = require('../duplicates');
 const { tildify } = require('../recent');
 const { normalizeShortcut } = require('./keyboard');
 const { listHeight, helpLayout } = require('./shortcuts');
+const { resolveFolder, isWithin, relocatePath } = require('../paths');
+const { validateFolderName } = require('./folders');
 
 function createState({
   targetDir, parent = '', name = '', keepNames = false, fileDates = false, duplicates = 'keep', groupBy = null,
@@ -44,6 +46,8 @@ function createState({
     cursor: 0,
     scroll: 0,
     edit: null, // { field: 'parent' | 'name' | 'dir' | 'rename', value, file (rename), matches (Tab completions) }
+    folderBrowser: null, // { dir, entries, loading, busy, previous: { mode, cursor, scroll }, dirty }
+    folderRequest: 0,
     progress: null, // { label, done, total }
     results: [],
     undo: null, // { count, at } for the last run in this folder, if any
@@ -112,6 +116,7 @@ function visibleFiles(state) {
 }
 
 function listItems(state) {
+  if (state.folderBrowser) return state.folderBrowser.entries;
   if (state.mode === 'history' || (state.mode === 'confirmUndo' && state.returnMode === 'history')) return state.runs;
   return state.mode === 'done' ? state.results : visibleFiles(state);
 }
@@ -255,6 +260,49 @@ function clearFilter(state) {
   return moveCursor(cleared, Math.max(0, cleared.files.indexOf(current)));
 }
 
+function parentValue(state, dir) {
+  return isWithin(state.targetDir, dir) ? path.relative(state.targetDir, dir) : dir;
+}
+
+function loadFolders(state, dir, { nearest = false, focus = null } = {}) {
+  const request = state.folderRequest + 1;
+  const previous = { mode: state.mode === 'edit' ? 'browse' : state.mode, cursor: state.cursor, scroll: state.scroll };
+  const browser = state.folderBrowser || { dir, entries: [], previous, dirty: false };
+  return [
+    { ...state, mode: 'folders', folderRequest: request, folderBrowser: { ...browser, loading: true, busy: false } },
+    { type: 'folders', dir, request, nearest, focus },
+  ];
+}
+
+function closeFolders(state) {
+  const { previous, dirty } = state.folderBrowser;
+  const closed = { ...state, ...previous, folderBrowser: null, edit: null };
+  return dirty && previous.mode === 'browse' ? scan(closed) : [closed];
+}
+
+function onFolderKey(state, key) {
+  const browser = state.folderBrowser;
+  if (browser.busy) return [state];
+  if (isQuit(key)) return closeFolders(state);
+  if (browser.loading) return [state];
+  const moved = navigate(state, key);
+  if (moved) return [moved];
+  const current = browser.entries[state.cursor];
+  if (isEnter(key) || key.name === 'right' || key.name === 'l') {
+    return current ? loadFolders(state, path.join(browser.dir, current.name)) : [state];
+  }
+  if (['left', 'backspace', 'h'].includes(key.name)) return loadFolders(state, path.dirname(browser.dir), { focus: path.basename(browser.dir) });
+  if (key.name === 's' || key.name === 'space') {
+    return scan({ ...state, ...browser.previous, mode: 'browse', parent: parentValue(state, browser.dir), folderBrowser: null, edit: null });
+  }
+  if (key.name === 'n') return [{ ...state, mode: 'edit', edit: { field: 'newFolder', value: '' } }];
+  if (key.name === 'e' && current) return [{ ...state, mode: 'edit', edit: { field: 'renameFolder', value: current.name, file: current.name } }];
+  if (key.str === '/') return [{ ...state, mode: 'edit', edit: { field: 'folderPath', value: tildify(browser.dir) } }];
+  if (key.name === 'r') return loadFolders(state, browser.dir, { focus: current && current.name });
+  if (key.str === '?') return [{ ...state, help: true, helpScroll: 0 }];
+  return [state];
+}
+
 function onFilterKey(state, key) {
   const withFilter = (filter) => [moveCursor({ ...state, filter, scroll: 0 }, 0)];
 
@@ -304,6 +352,8 @@ function onBrowseKey(state, key) {
   }
   case 'p':
     return [{ ...state, mode: 'edit', edit: { field: 'parent', value: state.parent } }];
+  case 'b':
+    return loadFolders(state, resolveFolder(state.targetDir, state.parent), { nearest: true });
   case 'n':
     return [{ ...state, mode: 'edit', edit: { field: 'name', value: state.name } }];
   case 'o':
@@ -337,6 +387,17 @@ function commitEdit(state) {
   const value = state.edit.value.trim();
   const closed = { ...state, mode: 'browse', edit: null };
 
+  if (state.folderBrowser) {
+    if (field === 'folderPath') return loadFolders(state, resolveFolder(state.folderBrowser.dir, value));
+    const error = validateFolderName(value);
+    if (error) return [{ ...state, message: { tone: 'error', text: error } }];
+    const request = state.folderRequest + 1;
+    return [
+      { ...state, mode: 'folders', folderRequest: request, folderBrowser: { ...state.folderBrowser, busy: true } },
+      { type: field === 'newFolder' ? 'createFolder' : 'renameFolder', dir: state.folderBrowser.dir, name: value, oldName: state.edit.file, request },
+    ];
+  }
+
   if (field === 'name') {
     const error = value ? validateName(value) : null;
     if (error) return [{ ...state, message: { tone: 'error', text: error } }];
@@ -364,8 +425,12 @@ function onEditKey(state, key) {
   const { value } = state.edit;
   const withValue = (next) => [{ ...state, edit: { ...state.edit, value: next, matches: null } }];
 
-  if (key.name === 'escape') return [{ ...state, mode: 'browse', edit: null }];
+  if (key.name === 'escape') return [{ ...state, mode: state.folderBrowser ? 'folders' : 'browse', edit: null }];
   if (isEnter(key)) return commitEdit(state);
+  if (key.name === 'tab' && state.edit.field === 'parent') return loadFolders(state, resolveFolder(state.targetDir, value), { nearest: true });
+  if (key.name === 'tab' && state.edit.field === 'folderPath') {
+    return [state, { type: 'complete', value, baseDir: state.folderBrowser.dir, field: 'folderPath' }];
+  }
   if (key.name === 'tab' && state.edit.field === 'dir') return [state, { type: 'complete', value }];
   if ((key.name === 'up' || key.name === 'down') && state.edit.field === 'dir' && state.recent.length) {
     // Like shell history: up goes to older folders, down back towards newer ones.
@@ -404,6 +469,7 @@ function onDoneKey(state, key) {
   if (key.name === 'r' || isEnter(key)) return scan({ ...state, cursor: 0, scroll: 0 });
   if (key.name === 'u') return askUndo(state);
   if (key.name === 'h') return [state, { type: 'history' }];
+  if (key.name === 'b') return loadFolders(state, resolveFolder(state.targetDir, state.parent), { nearest: true });
   if (key.str === '?') return [{ ...state, help: true }];
   if (key.name === 'v' && key.shift) return [state, OPEN_FOLDER];
   if (key.name === 'v') {
@@ -432,6 +498,7 @@ function onKey(state, key) {
   const current = state.message ? { ...state, message: null } : state;
   switch (state.mode) {
   case 'browse': return onBrowseKey(current, key);
+  case 'folders': return onFolderKey(current, key);
   case 'edit': return onEditKey(current, key);
   case 'filter': return onFilterKey(current, key);
   case 'confirm': return onConfirmKey(current, key);
@@ -460,6 +527,32 @@ function update(state, action) {
   }
   case 'scanned':
     return [onScanned(state, action)];
+  case 'foldersLoaded': {
+    if (!state.folderBrowser || action.request !== state.folderRequest) return [state];
+    let next = state;
+    if (action.renamed) {
+      const { from, to } = action.renamed;
+      const parent = parentValue(state, relocatePath(resolveFolder(state.targetDir, state.parent), from, to));
+      const results = state.results.map((result) => {
+        const folder = relocatePath(resolveFolder(state.targetDir, result.folder), from, to);
+        return { ...result, folder: parentValue(state, folder), destination: path.join(folder, result.newName) };
+      });
+      next = { ...next, parent, results };
+    }
+    return [moveCursor({
+      ...next, mode: 'folders', edit: null, scroll: 0,
+      cursor: Math.max(0, action.entries.findIndex((entry) => entry.name === action.focus)),
+      folderBrowser: { ...state.folderBrowser, dir: action.dir, entries: action.entries, loading: false, busy: false, dirty: state.folderBrowser.dirty || Boolean(action.changed) },
+      message: action.message ? { tone: 'info', text: action.message } : null,
+    }, Math.max(0, action.entries.findIndex((entry) => entry.name === action.focus)))];
+  }
+  case 'foldersFailed':
+    if (!state.folderBrowser || action.request !== state.folderRequest) return [state];
+    return [{
+      ...state, mode: state.edit ? 'edit' : 'folders',
+      folderBrowser: { ...state.folderBrowser, loading: false, busy: false },
+      message: { tone: 'error', text: friendlyError(action.error) },
+    }];
   case 'progress':
     return [{ ...state, progress: { ...state.progress, done: action.done, total: action.total } }];
   case 'executed':
@@ -489,7 +582,8 @@ function update(state, action) {
     return [{ ...state, message: { tone: action.tone, text: action.text } }];
   case 'completed': {
     // Ignored if the user left the folder field while the folder was being read.
-    if (state.mode !== 'edit' || state.edit.field !== 'dir') return [state];
+    if (state.mode !== 'edit' || state.edit.field !== (action.field || 'dir')) return [state];
+    if (action.requestValue !== undefined && state.edit.value !== action.requestValue) return [state];
     const message = action.matches.length === 0 ? { tone: 'error', text: 'No folder starts with that.' } : state.message;
     return [{ ...state, edit: { ...state.edit, value: action.value, matches: action.matches }, message }];
   }

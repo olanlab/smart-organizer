@@ -1,6 +1,7 @@
 const fs = require('fs-extra');
 const os = require('os');
 const path = require('path');
+const { expandHome, resolveFolder } = require('./paths');
 
 const CATEGORIES = {
   images: [
@@ -132,7 +133,7 @@ function validateName(name) {
 }
 
 function categoryFolder(parent, category) {
-  return parent ? path.join(parent, category) : category;
+  return parent ? path.join(expandHome(parent), category) : category;
 }
 
 const GROUPINGS = ['month', 'year'];
@@ -240,7 +241,7 @@ const nameKey = (name) => name.normalize('NFC').toLowerCase();
 async function readExistingNames(targetDir, folders) {
   const existing = new Map();
   await Promise.all([...new Set(folders)].map(async (folder) => {
-    const names = await fs.readdir(path.join(targetDir, folder)).catch(() => []);
+    const names = await fs.readdir(resolveFolder(targetDir, folder)).catch(() => []);
     existing.set(folder, new Set(names.map(nameKey)));
   }));
   return existing;
@@ -296,7 +297,7 @@ function planMoves(targetDir, files, {
       folder,
       newName,
       renamed: Boolean(custom),
-      destination: path.join(targetDir, folder, newName),
+      destination: path.join(resolveFolder(targetDir, folder), newName),
     };
   }
   return plan;

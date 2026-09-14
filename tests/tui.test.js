@@ -9,6 +9,7 @@ const { resolveDir, completePath, openCommand } = require('../src/tui/paths');
 const { stripAnsi, displayWidth, truncate } = require('../src/tui/text');
 const { readHistory, recordRun } = require('../src/history');
 const { scanDirectory, buildPlan, executePlan } = require('../src/organizer');
+const { resolveFolder } = require('../src/paths');
 
 // The TUI remembers recent folders in the settings folder; keep that away from the real one.
 process.env.XDG_CONFIG_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'org-tui-config-'));
@@ -58,6 +59,13 @@ describe('text helpers', () => {
   test('resolveDir expands ~ and resolves relative to the current folder', () => {
     expect(resolveDir('~/Downloads', '/x')).toBe(path.join(os.homedir(), 'Downloads'));
     expect(resolveDir('..', '/a/b')).toBe(path.resolve('/a'));
+    expect(resolveFolder('/downloads', '~/Archive')).toBe(path.join(os.homedir(), 'Archive'));
+    expect(resolveFolder('/downloads', '~')).toBe(os.homedir());
+    const file = [{ name: 'a.jpg', ext: '.jpg', category: 'images', selected: true }];
+    const [state] = run(createState({ targetDir: '/downloads', parent: '~/Archive', keepNames: true }), {
+      type: 'scanned', targetDir: '/downloads', files: file, existing: new Map(), date: DATE,
+    });
+    expect(state.plan[0].destination).toBe(path.join(os.homedir(), 'Archive', 'images', 'a.jpg'));
   });
 
   test('completePath finishes a folder name like a shell does', async () => {
@@ -81,6 +89,84 @@ describe('text helpers', () => {
 });
 
 describe('TUI state', () => {
+  function folders(state = scannedState(), dir = '/data', entries = [{ name: 'Archive' }, { name: 'Photos' }]) {
+    const [opening] = run(state, typed('ิ')); // b on Thai Kedmanee
+    return run(opening, { type: 'foldersLoaded', request: opening.folderRequest, dir, entries })[0];
+  }
+
+  test('the destination browser navigates folders and only applies a destination when selected', () => {
+    const base = { ...scannedState(), cursor: 1 };
+    const opened = folders(base);
+    expect(opened.targetDir).toBe('/data');
+    expect(opened.parent).toBe('');
+    expect(run(opened, key('return'))[1]).toMatchObject({ type: 'folders', dir: '/data/Archive' });
+    const [other] = run(opened, { type: 'foldersLoaded', request: opened.folderRequest, dir: '/outside', entries: [] });
+    const [cancelled] = run(other, key('escape'));
+    expect(cancelled.parent).toBe('');
+    expect(cancelled.cursor).toBe(1);
+    const [selected, effect] = run(other, typed('ห')); // s
+    expect(selected.parent).toBe('/outside');
+    expect(selected.targetDir).toBe('/data');
+    expect(selected.folderBrowser).toBeNull();
+    expect(effect).toEqual({ type: 'scan', dir: '/data' });
+  });
+
+  test('parent editing can open the browser with Tab and stale folder listings are ignored', () => {
+    const [opening, effect] = run(scannedState(), key('p'), typed('../Archive'), key('tab'));
+    expect(effect).toMatchObject({ type: 'folders', dir: '/Archive', nearest: true });
+    const [closed] = run(opening, key('escape'));
+    const [reopened] = run(closed, key('b'));
+    const [late] = run(reopened, { type: 'foldersLoaded', request: opening.folderRequest, dir: '/old', entries: [] });
+    expect(late.folderBrowser.loading).toBe(true);
+    expect(late.folderBrowser.dir).toBe('/data');
+  });
+
+  test('folder create and rename editors preserve Thai text and can be cancelled', () => {
+    const base = folders();
+    const [creating] = run(base, typed('ื'), typed('งานที่เชียงใหม่'));
+    expect(creating.edit).toMatchObject({ field: 'newFolder', value: 'งานที่เชียงใหม่' });
+    const [saving, effect] = run(creating, key('return'));
+    expect(effect).toMatchObject({ type: 'createFolder', dir: '/data', name: 'งานที่เชียงใหม่' });
+    expect(saving.folderBrowser.busy).toBe(true);
+    expect(run(saving, key('escape'))[0].folderBrowser).not.toBeNull();
+    const [cancelled, noEffect] = run(creating, key('escape'));
+    expect(cancelled.mode).toBe('folders');
+    expect(noEffect).toBeNull();
+    const [renaming] = run(base, typed('ำ'), key('u', { ctrl: true }), typed('ใหม่'));
+    expect(renaming.edit.field).toBe('renameFolder');
+    expect(run(renaming, key('return'))[1]).toMatchObject({ type: 'renameFolder', oldName: 'Archive', name: 'ใหม่' });
+  });
+
+  test('invalid names and failed folder operations keep the editor open for correction', () => {
+    const [invalid, effect] = run(folders(), key('n'), typed('../elsewhere'), key('return'));
+    expect(invalid.mode).toBe('edit');
+    expect(effect).toBeNull();
+    const [saving] = run(folders(), key('n'), typed('taken'), key('return'));
+    const [failed] = run(saving, { type: 'foldersFailed', request: saving.folderRequest, error: new Error('already exists') });
+    expect(failed.mode).toBe('edit');
+    expect(failed.edit.value).toBe('taken');
+    expect(failed.folderBrowser.busy).toBe(false);
+  });
+
+  test('folder path completion uses the browsed directory and does not overwrite newer typing', () => {
+    const [editing, effect] = run(folders(scannedState(), '/outside'), typed('ฝ'), key('u', { ctrl: true }), typed('Arch'), key('tab'));
+    expect(effect).toMatchObject({ type: 'complete', baseDir: '/outside', field: 'folderPath', value: 'Arch' });
+    const [typedMore] = run(editing, typed('x'), { type: 'completed', field: 'folderPath', requestValue: 'Arch', value: 'Archive/', matches: ['Archive'] });
+    expect(typedMore.edit.value).toBe('Archx');
+    expect(run(editing, key('return'))[1]).toMatchObject({ type: 'folders', dir: '/outside/Arch' });
+  });
+
+  test('renaming the selected destination updates it even when leaving the browser with Escape', () => {
+    const opened = folders(scannedState({ parent: '/outside/old' }), '/outside');
+    const [renamed] = run(opened, {
+      type: 'foldersLoaded', request: opened.folderRequest, dir: '/outside', entries: [{ name: 'new' }],
+      focus: 'new', changed: true, renamed: { from: '/outside/old', to: '/outside/new' },
+    });
+    const [closed, effect] = run(renamed, key('escape'));
+    expect(closed.parent).toBe('/outside/new');
+    expect(effect).toEqual({ type: 'scan', dir: '/data' });
+  });
+
   test.each([
     ['a', 'ฟ', 'ฤ'], ['c', 'แ', 'ฉ'], ['d', 'ก', 'ฏ'], ['e', 'ำ', 'ฎ'],
     ['f', 'ด', 'โ'], ['g', 'เ', 'ฌ'], ['h', '้', '็'], ['i', 'ร', 'ณ'],
@@ -286,7 +372,7 @@ describe('TUI state', () => {
     const [editing] = run(scannedState(), key('d'), key('u', { ctrl: true }), typed(long));
     const footer = plainRows(editing).at(-2);
 
-    expect(footer).toMatch(/Folder › ….*deep\/photos /);
+    expect(footer).toMatch(/Source folder › ….*deep\/photos /);
     expect(displayWidth(footer)).toBe(80);
   });
 
@@ -554,7 +640,7 @@ describe('TUI view', () => {
   test('important commands are visible in the bottom bar at 80 columns', () => {
     const rows = plainRows(scannedState()).slice(-2);
     const footer = rows.join('\n');
-    for (const hint of ['space select', 'enter organize', '/ filter', '↑↓ move', 'e rename', 'a all', 'n name', 'u undo', 'd folder', '? help', 'q quit']) {
+    for (const hint of ['space select', 'enter organize', '/ filter', '↑↓ move', 'e rename', 'a all', 'n name', 'u undo', 'd source', 'b destination', '? help', 'q quit']) {
       expect(footer).toContain(hint);
     }
     expect(footer).not.toContain('…');
@@ -595,12 +681,17 @@ describe('TUI view', () => {
     for (const width of [40, 59, 60, 69, 70, 79, 80, 120]) {
       for (const height of [10, 12, 24]) {
         const base = scannedState({ width, height });
+        const [opening] = run(base, key('b'));
+        const [chooser] = run(opening, { type: 'foldersLoaded', request: opening.folderRequest, dir: '/data', entries: [{ name: 'รูปภาพ' }] });
         const variants = [
           base, run(base, key('d'))[0], run(base, key('n'))[0], run(base, typed('/'))[0],
           run(base, key('return'))[0], run(base, typed('?'))[0],
           run(base, { type: 'historyLoaded', runs: [{ at: '2026-09-11', moves: [{ from: 'x', to: 'y' }] }] })[0],
           run(base, { type: 'executed', results: base.plan.map((move) => ({ ...move, ok: true })) })[0],
           run(base, key('return'), key('y'))[0],
+          opening, chooser, run(chooser, key('n'))[0], run(chooser, key('e'))[0],
+          run(chooser, typed('/'))[0], run(chooser, typed('?'))[0],
+          run(chooser, key('n'), typed('ใหม่'), key('return'))[0],
         ];
         for (const state of variants) {
           const rows = render(state);
@@ -677,7 +768,7 @@ describe('TUI view', () => {
     const text = plainRows(short).join('\n');
 
     expect(text).toContain('↑↓ scroll · other keys close');
-    expect(text).toMatch(/move\s+o {2}f\s+keep names \/ file dates/);
+    expect(text).toMatch(/move\s+d {2}r\s+source folder \/ rescan/);
     for (const label of ['filter / sort', 'toggle all / category', 'what to do with copies', 'undo / history / quit']) {
       expect(text).toContain(label);
     }
@@ -716,7 +807,7 @@ describe('TUI view', () => {
     const results = scannedState().plan.map((move, i) => (i === 1 ? { ...move, ok: false, error: new Error('EACCES') } : { ...move, ok: true }));
     const [done] = run(scannedState(), { type: 'executed', results });
 
-    expect(plainRows(editing).at(-2)).toContain('Parent folder ›');
+    expect(plainRows(editing).at(-2)).toContain('Destination ›');
     expect(plainRows(confirming).at(-2)).toContain('Move and rename 3 files?');
     expect(plainRows(done).join('\n')).toMatch(/2 files moved \(images 1 · audio 1\)\s+✘ 1 failed/);
   });
@@ -841,6 +932,52 @@ describe('runTui', () => {
     } finally {
       terminal.input.write('\x03');
       await session;
+    }
+  });
+
+  test('b creates, renames and chooses an external destination with Thai keys, then preserves undo after another folder rename', async () => {
+    const external = await fs.mkdtemp(path.join(os.tmpdir(), 'org-tui-destination-'));
+    const terminal = fakeTerminal();
+    const session = runTui({ targetDir: TEST_DIR, keepNames: true, input: terminal.input, output: terminal.output });
+    try {
+      await waitFor(() => terminal.frame().includes('2/2 selected'));
+      terminal.input.write('ิ'); // b
+      await waitFor(() => terminal.frame().includes('No subfolders'));
+      terminal.input.write('ฝ\x15'); // /, Ctrl+U
+      terminal.input.write(external);
+      terminal.input.write('\r');
+      await waitFor(() => terminal.frame().includes('No subfolders') && !terminal.frame().includes('Folder path ›'));
+      terminal.input.write('ืแฟ้มใหม่\r'); // n, name, Enter
+      await waitFor(() => terminal.frame().includes('Created folder: แฟ้มใหม่'));
+      expect((await fs.stat(path.join(external, 'แฟ้มใหม่'))).isDirectory()).toBe(true);
+      terminal.input.write('ำ\x15เก็บงาน\r'); // e, Ctrl+U, name, Enter
+      await waitFor(() => terminal.frame().includes('Renamed folder: แฟ้มใหม่ → เก็บงาน'));
+      expect(await fs.pathExists(path.join(TEST_DIR, 'holiday.jpg'))).toBe(true);
+      terminal.input.write('\r'); // open highlighted folder
+      await waitFor(() => terminal.frame().includes('No subfolders'));
+      terminal.input.write('ห'); // s: use this destination
+      await waitFor(() => terminal.frame().includes('2/2 selected'));
+      terminal.input.write('\rั');
+      await waitFor(() => terminal.frame().includes('2 files moved'));
+      expect(await fs.pathExists(path.join(external, 'เก็บงาน', 'images', 'holiday.jpg'))).toBe(true);
+
+      terminal.input.write('ิ'); // browse after organizing
+      await waitFor(() => terminal.frame().includes('destination folders') && terminal.frame().includes('images/'));
+      terminal.input.write('\x1b[D'); // go up; highlight the destination folder
+      await waitFor(() => terminal.frame().includes('❯ เก็บงาน/'));
+      terminal.input.write('ำ\x15จัดเรียบร้อย\r');
+      await waitFor(() => terminal.frame().includes('Renamed folder: เก็บงาน → จัดเรียบร้อย'));
+      terminal.input.write('\x1b'); // back to results
+      await waitFor(() => terminal.frame().includes('2 files moved'));
+      terminal.input.write('ีั'); // undo + yes
+      await waitFor(() => terminal.frame().includes('Restored 2 files'));
+      expect(await fs.pathExists(path.join(TEST_DIR, 'holiday.jpg'))).toBe(true);
+      expect(await fs.pathExists(path.join(TEST_DIR, 'notes.txt'))).toBe(true);
+      expect(await readHistory(TEST_DIR)).toEqual([]);
+    } finally {
+      terminal.input.write('\x03');
+      await session;
+      await fs.remove(external);
     }
   });
 

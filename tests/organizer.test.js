@@ -40,6 +40,21 @@ describe('Smart Organizer CLI', () => {
   const spawnCLI = (...args) => spawnSync('node', [CLI_PATH, ...args], CLI_OPTIONS);
   const today = formatDate();
 
+  test('an absolute destination keeps existing files, numbers collisions and can be undone', async () => {
+    const parent = path.join(path.dirname(TEST_DIR), 'external-destination');
+    await fs.outputFile(path.join(TEST_DIR, 'photo.jpg'), 'new photo');
+    await fs.outputFile(path.join(parent, 'images', 'photo.jpg'), 'existing photo');
+    const preview = runCLI('-d', TEST_DIR, '-p', parent, '--keep-names', '--dry-run');
+    expect(preview).toContain(path.join(parent, 'images', 'photo-2.jpg'));
+    expect(fs.existsSync(path.join(TEST_DIR, 'photo.jpg'))).toBe(true);
+    runCLI('-d', TEST_DIR, '-p', parent, '--keep-names', '-y');
+    expect(fs.readFileSync(path.join(parent, 'images', 'photo-2.jpg'), 'utf8')).toBe('new photo');
+    expect(fs.readFileSync(path.join(parent, 'images', 'photo.jpg'), 'utf8')).toBe('existing photo');
+    runCLI('-d', TEST_DIR, '--undo');
+    expect(fs.readFileSync(path.join(TEST_DIR, 'photo.jpg'), 'utf8')).toBe('new photo');
+    expect(fs.existsSync(path.join(parent, 'images', 'photo-2.jpg'))).toBe(false);
+  });
+
   test('should organize files into categorized folders and rename with date', async () => {
     await fs.ensureFile(path.join(TEST_DIR, 'image.jpg'));
     await fs.ensureFile(path.join(TEST_DIR, 'video.mp4'));

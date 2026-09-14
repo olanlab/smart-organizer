@@ -55,9 +55,10 @@ The bottom bar keeps the important shortcuts visible, wrapping them into rows to
 | `o` | Keep original names on / off |
 | `f` | Name by each file's modified date on / off |
 | `e` | Give the current file a name of its own (its extension stays; empty resets it) |
-| `p` | Set the parent folder |
+| `p` | Type the destination path directly (`Tab` opens the same browser as `b`) |
+| `b` | Browse destination folders; create and rename folders there |
 | `m` | Date subfolders: none, by month, by year |
-| `d` | Switch to another folder (`~`, relative paths and `Tab` completion work; `↑` `↓` go through recent folders) |
+| `d` | Change the **source** folder to organize (`~`, relative paths and `Tab` completion work; `↑` `↓` go through recent folders) |
 | `r` | Scan the folder again |
 
 | Doing it | |
@@ -66,6 +67,28 @@ The bottom bar keeps the important shortcuts visible, wrapping them into rows to
 | `u` | Undo the last run in this folder |
 | `h` | Show past runs; `enter` on one undoes it and every newer run |
 | `q` / `esc` | Quit |
+
+### Choosing and managing destination folders
+
+`d` changes the **Source**, where the files come from. `b` chooses the **Destination**, where category folders such as `images` and `documents` will be created. For example, use `d` for `~/Downloads` and `b` for `~/Archive` to organize files from Downloads into Archive. The top of the preview shows both; **(same as source)** means category folders will be created inside the source folder.
+
+Press `b` (Thai `ิ`) in the preview or results to open the folder browser. The path next to **Browse** is the folder you are looking inside; it becomes the destination only when you press `s` or `space`.
+
+| In the folder browser | |
+| --- | --- |
+| `↑` / `↓` | Highlight a folder |
+| `enter` / `→` | Open the highlighted folder |
+| `←` / `backspace` | Go up one folder |
+| `s` / `space` | Use the current folder as the destination, then return to the file preview |
+| `n` (Thai `ื`) | Create a new folder here; type its name and press Enter |
+| `e` (Thai `ำ`) | Rename the highlighted folder and keep its contents |
+| `/` (Thai `ฝ`) | Type a folder path; `Tab` completes it |
+| `r` | Refresh the folder list |
+| `esc` / `q` | Return without choosing another destination |
+
+For example: `b` → `n` → type `Sorted` → Enter → Enter to open it → `s` to use it. Files will be sorted into `Sorted/images`, `Sorted/documents`, etc. You can also type an absolute path or `~/Archive` with `p`, or use `/` in the browser to jump to an existing folder on another drive.
+
+Creating or renaming a folder takes effect when you submit its name; cancelling the browser later does not undo that operation. Existing files and folders are never replaced. Renaming a destination also updates the current source folder's undo history, so its organized files can still be restored. The active source folder and its parents cannot be renamed from this session. The browser lists visible folders; hidden paths can be opened by typing them.
 
 ## Command line
 ```bash
@@ -80,7 +103,7 @@ Scripts, pipes and cron jobs (anything without a terminal) organize right away, 
 | Where | |
 | --- | --- |
 | `-d, --dir <directory>` | Folder to organize (default: current folder) |
-| `-p, --parent <name>` | Put the category folders inside this folder |
+| `-p, --parent <directory>` | Destination root for categories: relative to the source, an absolute path, or `~/path` |
 | `--group-by <period>` | Date subfolders inside each category: `month` (`images/2024-03`) or `year` (`images/2024`), by modified date |
 
 | Naming | |
@@ -131,6 +154,7 @@ org --completion bash > ~/.org-completion.bash && echo 'source ~/.org-completion
 ### Recipes
 ```bash
 org -p Archive -y                                   # the current folder, into Archive/, straight away
+org -d ~/Downloads -p ~/Documents/Archive --keep-names # choose another destination, preview first
 org -d ~/Pictures/import --name japan-trip --dry-run # see the names first
 org -d ~/Pictures/import --file-date --group-by month # a photo library: images/2024-03/2024-03-14-1.jpg
 org -d ~/Downloads --only images,videos             # just the photos and videos

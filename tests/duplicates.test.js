@@ -29,6 +29,14 @@ afterAll(async () => {
 });
 
 describe('duplicates', () => {
+  test('finds copies already stored at an absolute destination, including grouped subfolders', async () => {
+    const parent = path.join(ROOT, 'external');
+    await fs.outputFile(path.join(parent, 'documents', '2026-09', 'report.pdf'), 'same bytes');
+    await write('report copy.pdf', 'same bytes');
+    expect(await duplicatesIn({ folders: organizedFolders(undefined, parent) })).toEqual({
+      'report copy.pdf': path.join(parent, 'documents', '2026-09', 'report.pdf'),
+    });
+  });
   test('marks files with identical content, keeping the oldest as the original', async () => {
     await write('report.pdf', 'same bytes', new Date(2024, 0, 1));
     await write('report (1).pdf', 'same bytes', new Date(2024, 0, 2));

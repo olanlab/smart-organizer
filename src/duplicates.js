@@ -5,6 +5,7 @@
 const crypto = require('crypto');
 const fs = require('fs-extra');
 const path = require('path');
+const { resolveFolder } = require('./paths');
 const { DEFAULT_CATEGORIES, categoryFolder, destinationFolder } = require('./organizer');
 
 const DUPLICATE_MODES = ['keep', 'skip', 'separate'];
@@ -39,7 +40,7 @@ function hashFile(file, limit = Infinity) {
 async function contentKeys(targetDir, group) {
   const prefixes = new Map();
   for (const file of group) {
-    prefixes.set(file, await hashFile(path.join(targetDir, file.name), PREFIX_BYTES).catch(() => null));
+    prefixes.set(file, await hashFile(path.resolve(targetDir, file.name), PREFIX_BYTES).catch(() => null));
   }
   if (group[0].size <= PREFIX_BYTES) return prefixes; // the start is the whole file
 
@@ -51,7 +52,7 @@ async function contentKeys(targetDir, group) {
     if (!prefix || seen.get(prefix) < 2) {
       keys.set(file, prefix && `${prefix}:alone`); // nothing else starts the same way
     } else {
-      keys.set(file, await hashFile(path.join(targetDir, file.name)).catch(() => null));
+      keys.set(file, await hashFile(path.resolve(targetDir, file.name)).catch(() => null));
     }
   }
   return keys;
@@ -60,11 +61,11 @@ async function contentKeys(targetDir, group) {
 // Files already sorted into `folder` (relative to targetDir), named by their relative path.
 // Looks one level deeper too, for folders grouped by month or year ("images/2024-03").
 async function listOrganized(targetDir, folder, depth = 1) {
-  const entries = await fs.readdir(path.join(targetDir, folder), { withFileTypes: true }).catch(() => []);
+  const entries = await fs.readdir(resolveFolder(targetDir, folder), { withFileTypes: true }).catch(() => []);
   const visible = entries.filter((entry) => !entry.name.startsWith('.'));
   const files = await Promise.all(visible.filter((entry) => entry.isFile()).map(async (entry) => {
     const name = path.join(folder, entry.name);
-    const stats = await fs.stat(path.join(targetDir, name)).catch(() => null);
+    const stats = await fs.stat(resolveFolder(targetDir, name)).catch(() => null);
     return stats && { name, size: stats.size, modified: stats.mtime, organized: true };
   }));
   const nested = depth > 0

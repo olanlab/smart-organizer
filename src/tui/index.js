@@ -14,6 +14,8 @@ const { organizedFolders, possibleDestinations, markDuplicates } = require('../d
 const { createState, update } = require('./state');
 const { render } = require('./view');
 const { resolveDir, completePath, openCommand } = require('./paths');
+const { listFolders, createFolder, renameFolder } = require('./folders');
+const { resolveFolder, relocatePath } = require('../paths');
 const { printable } = require('./text');
 const { readRecent, rememberFolder, tildify } = require('../recent');
 
@@ -106,7 +108,27 @@ function runTui({
       }
       const dir = state.targetDir;
       try {
-        if (effect.type === 'scan') {
+        if (['folders', 'createFolder', 'renameFolder'].includes(effect.type)) {
+          let renamed = null;
+          let message = null;
+          if (effect.type === 'createFolder') {
+            await createFolder(effect.dir, effect.name);
+            message = `Created folder: ${effect.name}`;
+          } else if (effect.type === 'renameFolder') {
+            renamed = await renameFolder(dir, effect.dir, effect.oldName, effect.name);
+            message = `Renamed folder: ${effect.oldName} → ${effect.name}`;
+            for (let i = 0; i < allResults.length; i++) {
+              const folder = relocatePath(resolveFolder(dir, allResults[i].folder), renamed.from, renamed.to);
+              allResults[i] = { ...allResults[i], folder, destination: path.join(folder, allResults[i].newName) };
+            }
+          }
+          const listed = await listFolders(effect.dir, { nearest: effect.nearest });
+          dispatch({
+            type: 'foldersLoaded', ...listed, request: effect.request,
+            focus: effect.name || effect.focus, renamed, changed: Boolean(message),
+            message: message || (listed.dir !== effect.dir ? 'Destination does not exist yet. Choose a folder or press n to create one.' : null),
+          });
+        } else if (effect.type === 'scan') {
           const scanDir = resolveDir(effect.dir, dir);
           const folders = organizedFolders(categories, state.parent);
           if (!(await isDirectory(scanDir))) throw new Error(`Not a folder: ${scanDir}`);
@@ -157,16 +179,18 @@ function runTui({
         } else if (effect.type === 'history') {
           dispatch({ type: 'historyLoaded', runs: await readHistory(dir) });
         } else if (effect.type === 'open') {
-          const opened = await openFile(path.join(dir, effect.file)).then(() => null, (error) => error);
+          const opened = await openFile(path.resolve(dir, effect.file)).then(() => null, (error) => error);
           dispatch(opened
             ? { type: 'notice', tone: 'error', text: `Could not open ${effect.label || effect.file}: ${opened.message}` }
             : { type: 'notice', tone: 'info', text: `Opened ${effect.label || effect.file}` });
         } else if (effect.type === 'complete') {
-          const { value, matches } = await completePath(effect.value, dir);
-          dispatch({ type: 'completed', value, matches });
+          const { value, matches } = await completePath(effect.value, effect.baseDir || dir);
+          dispatch({ type: 'completed', value, matches, field: effect.field, requestValue: effect.value });
         }
       } catch (error) {
-        dispatch({ type: 'failed', error });
+        dispatch(['folders', 'createFolder', 'renameFolder'].includes(effect.type)
+          ? { type: 'foldersFailed', error, request: effect.request }
+          : { type: 'failed', error });
       }
     };
 
@@ -183,7 +207,7 @@ function runTui({
         draw();
         if (effect) {
           const task = perform(effect);
-          if (effect.type === 'execute' || effect.type === 'undo') mutation = task;
+          if (['execute', 'undo', 'createFolder', 'renameFolder'].includes(effect.type)) mutation = task;
         }
       } catch (error) {
         close();

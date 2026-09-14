@@ -4,7 +4,7 @@
 const SHELLS = ['zsh', 'bash'];
 
 // Options that take a folder or a file get those completed; others take free text.
-const VALUE_KINDS = { '--dir': 'directory', '--config': 'file' };
+const VALUE_KINDS = { '--dir': 'directory', '--parent': 'directory', '--config': 'file' };
 
 const takesValue = (option) => option.required || option.optional;
 const flagsOf = (option) => [option.short, option.long].filter(Boolean);
