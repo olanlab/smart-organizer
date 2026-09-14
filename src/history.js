@@ -3,6 +3,7 @@
 
 const fs = require('fs-extra');
 const path = require('path');
+const { resolveFolder } = require('./paths');
 
 const HISTORY_FILE = '.org-history.json';
 const MAX_RUNS = 20;
@@ -37,7 +38,7 @@ async function lastRun(targetDir) {
 async function recordRun(targetDir, results, date = new Date()) {
   const moves = results
     .filter((result) => result.ok)
-    .map((result) => ({ from: result.name, to: path.join(result.folder, result.newName) }));
+    .map((result) => ({ from: result.name, to: path.relative(targetDir, resolveFolder(targetDir, path.join(result.folder, result.newName))) }));
   if (moves.length === 0) return null;
 
   const run = { at: date.toISOString(), moves };
@@ -97,4 +98,4 @@ async function undoLastRun(targetDir, { onProgress, signal } = {}) {
   return { run, results, remaining: pending.length };
 }
 
-module.exports = { HISTORY_FILE, MAX_RUNS, readHistory, lastRun, recordRun, undoLastRun };
+module.exports = { HISTORY_FILE, MAX_RUNS, readHistory, writeHistory, lastRun, recordRun, undoLastRun };

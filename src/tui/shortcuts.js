@@ -8,14 +8,30 @@ const HELP = [
   ['space', 'include or skip file'],
   ['a  c', 'toggle all / category'],
   ['x', 'what to do with copies'],
-  ['p  n  m', 'parent / name / by month'],
+  ['n  m', 'name / by month'],
   ['o  f', 'keep names / file dates'],
-  ['d  r', 'switch folder / rescan'],
+  ['d  r', 'source folder / rescan'],
   ['i  v V  e', 'details / open / rename'],
   ['enter', 'organize selected'],
   ['u  h  q', 'undo / history / quit'],
+  ['b', 'choose destination'],
+  ['p', 'type destination path'],
   ['Thai Kedmanee', 'same physical shortcut keys'],
 ];
+
+const FOLDER_HELP = [
+  ['↑↓  j k', 'move through folders'],
+  ['enter  →', 'open highlighted folder'],
+  ['←  backspace', 'go to parent folder'],
+  ['s  space', 'use this destination'],
+  ['n', 'create a folder here'],
+  ['e', 'rename highlighted folder'],
+  ['/', 'type a folder path'],
+  ['r', 'refresh folders'],
+  ['esc  q', 'back to file preview'],
+  ['Thai Kedmanee', 'same physical keys'],
+];
+const helpEntries = (state) => state.folderBrowser ? FOLDER_HELP : HELP;
 
 const PROMPT_MODES = new Set(['edit', 'filter', 'confirm', 'confirmUndo', 'running']);
 const HELP_QUIT = [['?', 'help'], ['q', 'quit']];
@@ -46,11 +62,19 @@ function shortcutRows(state) {
   const { width } = state;
   if (state.help) return pack([['↑↓', 'scroll']], [['esc', 'close']], width, 1);
   switch (state.mode) {
+  case 'folders':
+    if (state.folderBrowser.busy) return pack([], [['ctrl+c', 'quit when done']], width, 1);
+    return pack([
+      ['enter', 'open'], ['s', 'use destination'], ['n', 'new'], ['e', 'rename'],
+      ['←', 'up'], ['/', 'path'], ['↑↓', 'move'], ['r', 'refresh'],
+    ], [['?', 'help'], ['esc', 'back']], width, width < 70 && state.height >= 12 ? 3 : 2);
   case 'edit':
     return pack([
       ...(state.edit.field === 'dir' ? [['Tab', 'complete'], ['↑↓', 'recent']] : []),
+      ...(state.edit.field === 'parent' ? [['Tab', 'browse']] : []),
+      ...(state.edit.field === 'folderPath' ? [['Tab', 'complete']] : []),
       ['ctrl+u', 'clear'],
-    ], [['enter', 'save'], ['esc', 'cancel']], width, width < 70 ? 2 : 1);
+    ], [['enter', { newFolder: 'create', renameFolder: 'rename', folderPath: 'open' }[state.edit.field] || 'save'], ['esc', 'cancel']], width, width < 70 ? 2 : 1);
   case 'filter':
     return pack([['↑↓', 'move'], ['ctrl+u', 'clear']], [['enter', 'keep'], ['esc', 'clear']], width, width < 60 ? 2 : 1);
   case 'confirm':
@@ -63,12 +87,12 @@ function shortcutRows(state) {
   case 'history':
     return pack([['enter', 'undo to here'], ['↑↓', 'move']], [['esc', 'back'], ...HELP_QUIT], width, 2);
   case 'done':
-    return pack([['u', 'undo'], ['r', 'rescan'], ['↑↓', 'scroll'], ['v', 'open'], ['h', 'history']], HELP_QUIT, width, 2);
+    return pack([['u', 'undo'], ['r', 'rescan'], ['↑↓', 'scroll'], ['b', 'destination'], ['v', 'open'], ['h', 'history']], HELP_QUIT, width, 2);
   default:
     return pack([
       ['space', 'select'], ['enter', 'organize'], ['/', 'filter'], ['↑↓', 'move'],
-      ['e', 'rename'], ['a', 'all'], ['u', 'undo'], ['n', 'name'], ['d', 'folder'],
-      ['h', 'history'], ['p', 'parent'], ['s', 'sort'], ['x', 'copies'],
+      ['d', 'source'], ['b', 'destination'], ['e', 'rename'], ['a', 'all'],
+      ['u', 'undo'], ['n', 'name'], ['h', 'history'], ['s', 'sort'], ['x', 'copies'],
     ], HELP_QUIT, width, width < 70 && state.height >= 12 ? 3 : 2);
   }
 }
@@ -84,8 +108,9 @@ function listHeight(state) {
 
 function helpLayout(state) {
   const room = Math.max(1, listHeight(state) - 1);
-  const columns = HELP.length > room && state.width >= 80 ? 2 : 1;
-  return { room, columns, rows: Math.ceil(HELP.length / columns) };
+  const entries = helpEntries(state);
+  const columns = entries.length > room && state.width >= 80 ? 2 : 1;
+  return { room, columns, rows: Math.ceil(entries.length / columns) };
 }
 
-module.exports = { HELP, shortcutRows, hasPrompt, listHeight, helpLayout };
+module.exports = { HELP, helpEntries, shortcutRows, hasPrompt, listHeight, helpLayout };

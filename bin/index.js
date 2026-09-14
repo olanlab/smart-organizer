@@ -302,7 +302,7 @@ program
   // Grouped, so the long list of options in --help is easy to scan.
   .optionsGroup('Where:')
   .option('-d, --dir <directory>', 'Directory to organize', '.')
-  .option('-p, --parent <name>', 'Name of the parent folder to store categories (optional)')
+  .option('-p, --parent <directory>', 'Destination root for category folders (relative to source, absolute or ~/path)')
   .addOption(new Option('--group-by <period>', 'Put files in date subfolders like images/2024-03 (by modified date)')
     .choices(GROUPINGS))
   .optionsGroup('Naming:')

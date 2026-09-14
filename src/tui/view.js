@@ -8,7 +8,7 @@ const {
 } = require('../organizer');
 const { printable, displayWidth, truncate, padEnd } = require('./text');
 const { SORT_LABELS, listHeight, listItems, visibleFiles } = require('./state');
-const { HELP, shortcutRows, hasPrompt, helpLayout } = require('./shortcuts');
+const { helpEntries, shortcutRows, hasPrompt, helpLayout } = require('./shortcuts');
 
 const MIN_WIDTH = 40;
 const MIN_HEIGHT = 10;
@@ -27,10 +27,13 @@ const CATEGORY_COLORS = {
 };
 
 const EDIT_LABELS = {
-  parent: ['Parent folder', 'empty = none'],
+  parent: ['Destination', 'empty = same as source'],
   name: ['File name', 'empty = today\'s date'],
-  dir: ['Folder', 'Tab completes folder names'],
+  dir: ['Source folder', 'Tab completes folder names'],
   rename: ['New name', 'the extension stays; empty = back to normal'],
+  newFolder: ['New folder', 'created in the folder shown above'],
+  renameFolder: ['Rename folder', 'contents stay inside; existing names are never replaced'],
+  folderPath: ['Folder path', 'absolute, relative or ~/path; Tab completes'],
 };
 
 // Custom categories from the settings file get a steady color picked from their name.
@@ -81,7 +84,7 @@ function footerRows(state) {
 
 function titleRow(state, version) {
   const left = [[' Smart Organizer', chalk.bold.cyan], [version ? ` v${version}` : '', chalk.dim]];
-  const status = {
+  const status = state.folderBrowser ? (state.folderBrowser.loading ? 'reading folders…' : state.folderBrowser.busy ? 'working…' : 'destination folders') : {
     loading: 'scanning…',
     running: `${(state.progress && state.progress.label.toLowerCase()) || 'working'}…`,
     done: `${state.results.filter((result) => result.ok).length} moved`,
@@ -100,15 +103,19 @@ function nameSegments(state) {
 }
 
 function optionRows(state) {
+  if (state.folderBrowser) return [
+    row([[' Browse  ', chalk.dim], [truncate(printable(state.folderBrowser.dir), state.width - 9, { middle: true }), chalk.bold]], state.width),
+    row([[' Destination  ', chalk.dim], [truncate(printable(state.parent || state.targetDir), state.width - 14, { middle: true }), chalk.bold]], state.width),
+  ];
   return [
     row([
-      [' Folder  ', chalk.dim],
+      [' Source  ', chalk.dim],
       [truncate(printable(state.targetDir), state.width - (state.folderFile ? 27 : 9), { middle: true }), chalk.bold],
       [state.folderFile ? '  (folder settings)' : '', chalk.dim],
     ], state.width),
     row([
-      [' Parent  ', chalk.dim],
-      [state.parent || '(none)', state.parent ? chalk.bold : chalk.dim],
+      [' Destination  ', chalk.dim],
+      [state.parent || '(same as source)', state.parent ? chalk.bold : chalk.dim],
       ...(state.groupBy ? [['    Group  ', chalk.dim], [`by ${state.groupBy}`, chalk.bold]] : []),
       ['    Name  ', chalk.dim],
       ...nameSegments(state),
@@ -161,13 +168,14 @@ function emptyText(state) {
     const reasons = [...new Set(state.leftAlone.map((file) => file.reason))].join(', ');
     return `Nothing to organize: ${countFiles(state.leftAlone.length)} left alone (${reasons}).`;
   }
-  return 'Nothing to organize here. Press d to pick another folder (Tab completes names).';
+  return 'Nothing to organize here. Press d to change the source folder.';
 }
 
 // The key list, in two columns when it doesn't fit in one and the terminal is wide enough.
 function helpRows(state) {
   const { width } = state;
   const { room, columns, rows: total } = helpLayout(state);
+  const HELP = helpEntries(state);
   const entry = ([key, label]) => [[`  ${padEnd(key, 14)}`, chalk.cyan.bold], [label]];
   const title = row([[' Keys', chalk.bold], ['   ↑↓ scroll · other keys close', chalk.dim]], width);
   const offset = Math.min(state.helpScroll, Math.max(0, total - room));
@@ -204,6 +212,15 @@ function historyRows(state) {
 function listRows(state) {
   const { width } = state;
   if (state.help) return helpRows(state);
+  if (state.folderBrowser) {
+    const { entries, loading } = state.folderBrowser;
+    if (loading) return [row([[' Reading folders…', chalk.dim]], width)];
+    if (!entries.length) return [row([[' No subfolders. Press n to create one.', chalk.dim]], width)];
+    return entries.slice(state.scroll, state.scroll + listHeight(state)).map((entry, i) => row([
+      [state.cursor === state.scroll + i ? '❯ ' : '  ', chalk.cyan],
+      [`${entry.name}${path.sep}`, state.cursor === state.scroll + i ? chalk.bold.cyan : String],
+    ], width));
+  }
   if (state.mode === 'history' || (state.mode === 'confirmUndo' && state.returnMode === 'history')) {
     return historyRows(state);
   }
@@ -239,6 +256,7 @@ function scrollLabel(state) {
 
 // Shown on the rule above the list: any active filter and a non-default sort order.
 function listLabel(state) {
+  if (state.folderBrowser) return state.help ? '' : 'Folders';
   if (state.mode === 'done' || state.help) return '';
   const parts = [];
   if (state.filter) parts.push(`filter "${state.filter}" · ${visibleFiles(state).length} of ${state.files.length}`);
@@ -269,6 +287,10 @@ function statusRow(state) {
   if (state.message) {
     const style = state.message.tone === 'error' ? chalk.red : chalk.green;
     return row([[` ${state.message.text}`, style]], state.width);
+  }
+  if (state.folderBrowser) {
+    const browser = state.folderBrowser;
+    return row([[browser.busy ? ' Finishing folder operation…' : ' Create/rename applies immediately.', chalk.dim]], state.width);
   }
   if (state.mode === 'edit' && state.edit.field === 'dir' && state.recent.length) {
     return row([[' ↑↓ recent: ', chalk.dim], [state.recent.join('  ·  ')]], state.width);
